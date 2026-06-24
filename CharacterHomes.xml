@@ -132,7 +132,7 @@
 
         <!-- Differentiating label left-aligned with friend housing "Friend:" label -->
         <Label name="$(parent)AddBarLabel" font="ZoFontGame" color="888888" text="My homes:">
-          <Anchor point="LEFT" relativePoint="LEFT" relativeTo="$(parent)AddRefBg" offsetX="52" offsetY="0"/>
+          <Anchor point="LEFT" relativePoint="LEFT" relativeTo="$(parent)AddRefBg" offsetX="25" offsetY="0"/>
         </Label>
 
         <!-- House label (mirrors FHHouseLabel position) -->
