@@ -1,0 +1,10 @@
+## Title: Character Homes
+## Description: Per-character and account-wide home shortcuts with teleport dialog
+## Author:
+## Version: 1
+## AddOnVersion: 1
+## APIVersion: 101047
+## SavedVariables: CharacterHomesSavedVars
+
+CharacterHomes.lua
+CharacterHomes.xml
