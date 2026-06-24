@@ -53,6 +53,14 @@ local function getHouseName(houseId)
     return GetMapName() or ("House #" .. houseId)
 end
 
+local function makeEntryKey(houseId, owner)
+    local houseName = getHouseName(houseId)
+    if owner and owner ~= "" then
+        return owner .. "_" .. houseName
+    end
+    return houseName
+end
+
 -- Must be defined before currentHouseInfo which calls it.
 local function getHouseZone(houseId)
     local zoneId = GetHouseZoneId(houseId)
@@ -101,7 +109,7 @@ function CH.SlashSetHome(args)
     end
     local houseId, owner, houseName, zoneName = currentHouseInfo()
     if not houseId then msg("You must be inside a house.") return end
-    CH.sv.account[houseName] = { houseId = houseId, owner = owner, displayName = name, zone = zoneName }
+    CH.sv.account[makeEntryKey(houseId, owner)] = { houseId = houseId, owner = owner, displayName = name, zone = zoneName }
     msg("Account home '|cffffff%s|r' -> %s%s", name, houseName,
         owner and (" (|cffffff" .. owner .. "|r)") or "")
     refreshIfOpen()
@@ -125,7 +133,7 @@ function CH.SlashSetMyHome(args)
             d("[CH DEBUG] sv.characters key check = " .. tostring(CH.sv.characters[charName()] ~= nil))
         end
     else
-        cd.named[houseName] = entry
+        cd.named[makeEntryKey(houseId, owner)] = entry
         msg("Character home '|cffffff%s|r' -> %s%s", name, houseName, ownerStr)
         refreshIfOpen()
     end
@@ -340,10 +348,11 @@ local function getSearchFilter()
     return string.lower(zo_strtrim(eb:GetText() or ""))
 end
 
-local function entryMatchesFilters(officialKey, entry)
+local function entryMatchesFilters(_, entry)
     local search = getSearchFilter()
     if search == "" then return true end
-    if string.lower(officialKey):find(search, 1, true)             then return true end
+    local houseName = getHouseName(entry.houseId) or ""
+    if string.lower(houseName):find(search, 1, true)               then return true end
     if string.lower(entry.displayName or ""):find(search, 1, true) then return true end
     if string.lower(entry.zone or ""):find(search, 1, true)        then return true end
     if string.lower(entry.owner or ""):find(search, 1, true)       then return true end
@@ -810,18 +819,20 @@ local function buildFriendHousingBar()
             return
         end
         local officialKey = getHouseName(selectedHouseId)
+        local entryKey    = makeEntryKey(selectedHouseId, selectedFriend)
         local labelText   = zo_strtrim(fhNameEdit:GetText() or "")
-        local displayName = labelText ~= "" and labelText or officialKey
+        local displayName = labelText ~= "" and labelText
+                            or (fhTypeIndex == 1 and "Primary Residence" or officialKey)
         local zone        = getHouseZone(selectedHouseId)
         local entry = { houseId = selectedHouseId, owner = selectedFriend, displayName = displayName, zone = zone }
         if fhTypeIndex == 1 then
             charData().primary = entry
             msg("Primary home set to |cffffff%s|r (|c7a9cbf%s|r).", displayName, selectedFriend)
         elseif fhTypeIndex == 2 then
-            charData().named[officialKey] = entry
+            charData().named[entryKey] = entry
             msg("Character home '|cffffff%s|r' saved (|c7a9cbf%s|r).", displayName, selectedFriend)
         else
-            CH.sv.account[officialKey] = entry
+            CH.sv.account[entryKey] = entry
             msg("Account home '|cffffff%s|r' saved (|c7a9cbf%s|r).", displayName, selectedFriend)
         end
         fhNameEdit:SetText("")
@@ -904,17 +915,18 @@ local function buildAddBar()
             return
         end
         local labelText   = zo_strtrim(addLabelEdit:GetText() or "")
-        local displayName = labelText ~= "" and labelText or selectedHouseInfo.name
-        local officialKey = selectedHouseInfo.name
+        local displayName = labelText ~= "" and labelText
+                            or (addTypeIndex == 1 and "Primary Residence" or selectedHouseInfo.name)
+        local entryKey    = makeEntryKey(selectedHouseInfo.houseId, nil)
         local entry = { houseId = selectedHouseInfo.houseId, displayName = displayName, zone = selectedHouseInfo.zone }
         if addTypeIndex == 1 then
             charData().primary = entry
             msg("Primary home set to |cffffff%s|r.", displayName)
         elseif addTypeIndex == 2 then
-            charData().named[officialKey] = entry
+            charData().named[entryKey] = entry
             msg("Character home '|cffffff%s|r' saved.", displayName)
         else
-            CH.sv.account[officialKey] = entry
+            CH.sv.account[entryKey] = entry
             msg("Account home '|cffffff%s|r' saved.", displayName)
         end
         addLabelEdit:SetText("")
@@ -980,7 +992,7 @@ end
 local function onAddonLoaded(_, name)
     if name ~= "CharacterHomes" then return end
 
-    CH.sv = ZO_SavedVars:NewAccountWide("CharacterHomesSavedVars", 2, nil, {
+    CH.sv = ZO_SavedVars:NewAccountWide("CharacterHomesSavedVars", 3, nil, {
         account    = {},
         characters = {},
     })
@@ -1004,12 +1016,13 @@ local function onAddonLoaded(_, name)
     local function migrateTable(tbl)
         local rekeyed = {}
         for k, v in pairs(tbl) do
-            local officialKey = getHouseName(v.houseId) or k
-            v.zone = getHouseZone(v.houseId)  -- always recompute to fix old wrong values
+            local houseName   = getHouseName(v.houseId) or k
+            local newKey      = makeEntryKey(v.houseId, v.owner)
+            v.zone = getHouseZone(v.houseId)
             if not v.displayName or v.displayName == k then
-                v.displayName = k  -- preserve old key as displayName if it was the label
+                v.displayName = houseName
             end
-            rekeyed[officialKey] = v
+            rekeyed[newKey] = v
         end
         return rekeyed
     end
