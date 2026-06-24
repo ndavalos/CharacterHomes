@@ -693,23 +693,82 @@ local function buildFriendHousingBar()
     friendComboCtrl:SetAnchor(LEFT, ref, LEFT, 78, 0)
     friendComboCtrl:SetDimensions(200, 28)
     local friendCb = ZO_ComboBox_ObjectFromContainer(friendComboCtrl)
+    friendCb:SetSortsItems(false)
 
-    local numFriends = GetNumFriends()
+    -- collect friends
     local friendNames = {}
+    local seenLower   = {}
+    local numFriends  = GetNumFriends()
     for i = 1, numFriends do
         local displayName = GetFriendInfo(i)
         if displayName and displayName ~= "" then
             table.insert(friendNames, displayName)
+            seenLower[string.lower(displayName)] = true
         end
     end
     table.sort(friendNames, function(a, b) return string.lower(a) < string.lower(b) end)
-    for _, name in ipairs(friendNames) do
+
+    -- collect guild masters (rankIndex 1) and officers (rankIndex 2), grouped by guild
+    -- deduplicated against friends list so no @account appears twice
+    local guildGroups = {}
+    local numGuilds   = GetNumGuilds()
+    for gi = 1, numGuilds do
+        local guildId   = GetGuildId(gi)
+        local guildName = GetGuildName(guildId)
+        local members   = {}
+        local numMembers = GetNumGuildMembers(guildId)
+        for mi = 1, numMembers do
+            local displayName, _, rankIndex = GetGuildMemberInfo(guildId, mi)
+            if displayName and displayName ~= "" and rankIndex <= 2 then
+                local low = string.lower(displayName)
+                if not seenLower[low] then
+                    table.insert(members, displayName)
+                    seenLower[low] = true
+                end
+            end
+        end
+        table.sort(members, function(a, b) return string.lower(a) < string.lower(b) end)
+        if #members > 0 then
+            table.insert(guildGroups, { name = guildName, members = members })
+        end
+    end
+
+    -- populate combo with section headers (non-selectable) and member entries
+    local itemIndex          = 0
+    local firstSelectableIdx = nil
+
+    local function addSectionHeader(label)
+        itemIndex = itemIndex + 1
+        local entry = friendCb:CreateItemEntry("|c888888-- " .. label .. " --|r", function()
+            -- header: re-assert current selection so clicking it changes nothing
+            if selectedFriend then
+                friendCb:SetSelectedItemText(selectedFriend)
+            end
+        end)
+        friendCb:AddItem(entry)
+    end
+
+    local function addFriendEntry(name)
+        itemIndex = itemIndex + 1
         local n = name
         friendCb:AddItem(friendCb:CreateItemEntry(n, function() selectedFriend = n end))
+        if not firstSelectableIdx then
+            firstSelectableIdx = itemIndex
+            selectedFriend     = n
+        end
     end
+
     if #friendNames > 0 then
-        selectedFriend = friendNames[1]
-        friendCb:SelectFirstItem()
+        addSectionHeader("── Friends ──")
+        for _, name in ipairs(friendNames) do addFriendEntry(name) end
+    end
+    for _, group in ipairs(guildGroups) do
+        addSectionHeader("── " .. group.name .. " ──")
+        for _, name in ipairs(group.members) do addFriendEntry(name) end
+    end
+
+    if firstSelectableIdx then
+        friendCb:SelectItemByIndex(firstSelectableIdx)
     end
 
     -- Type dropdown — anchor RIGHT of friend combo, w=200 to match add bar type combo
