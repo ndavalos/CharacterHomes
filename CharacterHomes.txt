@@ -1,6 +1,6 @@
 ## Title: Character Homes
 ## Description: Per-character and account-wide home shortcuts with teleport dialog
-## Author:
+## Author: g0thicicecream
 ## Version: 1.2.2
 ## AddOnVersion: 1
 ## APIVersion: 101050
