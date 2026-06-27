@@ -13,8 +13,8 @@ local SAVE_ICON      = "/esoui/art/buttons/accept_up.dds"
 local SAVE_ICON_MO   = "/esoui/art/buttons/accept_over.dds"
 local ROW_H          = 44
 
--- Single account-wide SavedVars.  Structure:
--- CH.sv = {
+-- Single account-wide SavedVars, keyed per megaserver.  Structure:
+-- CharacterHomesSavedVars[GetWorldName()]["@account"]["$AccountWide"] = {
 --   account    = { [alias] = { houseId, owner, displayName, zone } },
 --   characters = { [charName] = { primary = {...} or nil, named = { [alias] = {...} } } }
 -- }
@@ -933,7 +933,7 @@ local function buildAddBar()
         zo_callLater(populateDialog, 0)
     end)
 
-    -- Teleport button (replaces old X/clear): ports to currently selected owned house
+    -- Teleport button: ports to currently selected owned house
     local teleBtn = CharacterHomesDialogClearButton
     teleBtn:SetHandler("OnClicked", function()
         if not selectedHouseInfo then
@@ -992,10 +992,22 @@ end
 local function onAddonLoaded(_, name)
     if name ~= "CharacterHomes" then return end
 
+    -- Migrate legacy "Default" profile to the server-specific profile so EU and
+    -- NA megaserver characters don't share the same saved data bucket.
+    -- Total oversight when I created this, forgot there was a separation between NA and EU
+    local server = GetWorldName()
+    if server and server ~= "" and server ~= "Default" then
+        local raw = CharacterHomesSavedVars
+        if raw and raw["Default"] and not raw[server] then
+            raw[server] = raw["Default"]
+            raw["Default"] = nil
+        end
+    end
+
     CH.sv = ZO_SavedVars:NewAccountWide("CharacterHomesSavedVars", 3, nil, {
         account    = {},
         characters = {},
-    })
+    }, server)
 
     -- ensure top-level keys exist (guards against stale saves from version 1)
     if not CH.sv.account    then CH.sv.account    = {} end
