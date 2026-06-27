@@ -3,7 +3,7 @@
 ## Author:
 ## Version: 1.1
 ## AddOnVersion: 1
-## APIVersion: 101047
+## APIVersion: 101050
 ## SavedVariables: CharacterHomesSavedVars
 
 CharacterHomes.lua
